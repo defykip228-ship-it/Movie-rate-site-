@@ -107,8 +107,21 @@ authForm.addEventListener('submit', async (e) => {
     }
 });
 
-logoutBtn.addEventListener('click', async () => { await supabaseClient.auth.signOut(); alert("Ви вийшли."); });
-
+// Бронебійна кнопка ВИЙТИ
+logoutBtn.addEventListener('click', async () => {
+    // 1. Просимо Supabase закрити сесію
+    await supabaseClient.auth.signOut();
+    
+    // 2. Жорстко очищаємо пам'ять браузера від будь-яких залишків старих акаунтів
+    for (let key in localStorage) {
+        if (key.includes('-auth-token') || key.includes('supabase')) {
+            localStorage.removeItem(key);
+        }
+    }
+    
+    // 3. Миттєво перезавантажуємо сторінку, щоб скинути всі фільтри та стан сайту
+    window.location.reload();
+});
 // Коли юзер входить - завантажуємо його лайки
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session) {
