@@ -141,6 +141,7 @@ async function loadFavorites() {
 }
 
 // Функція кліку по сердечку
+// Функція кліку по сердечку (Тепер з перевіркою помилок!)
 window.toggleFavorite = async function(movieId, event) {
     event.stopPropagation(); // Щоб не відкривалося модальне вікно фільму
     if (!currentUser) { alert("Будь ласка, увійдіть в акаунт, щоб зберігати фільми!"); return; }
@@ -153,15 +154,26 @@ window.toggleFavorite = async function(movieId, event) {
         userFavorites = userFavorites.filter(id => id !== movieId);
         button.classList.remove('liked');
         button.innerText = '🤍';
-        await supabaseClient.from('user_actions').delete().eq('user_id', currentUser.id).eq('movie_id', movieId);
-        // Якщо ми у вкладці "Мої фільми" - одразу прибираємо фільм з екрану
+        
+        const { error } = await supabaseClient.from('user_actions').delete().eq('user_id', currentUser.id).eq('movie_id', movieId);
+        if (error) { console.error("Помилка видалення:", error); alert("Не вдалося видалити: " + error.message); }
+        
         if (isFavoritesMode) button.closest('.movie').remove();
     } else {
         // Ставимо лайк
         userFavorites.push(movieId);
         button.classList.add('liked');
         button.innerText = '❤️';
-        await supabaseClient.from('user_actions').insert({ user_id: currentUser.id, movie_id: movieId, is_favorite: true });
+        
+        const { error } = await supabaseClient.from('user_actions').insert({ user_id: currentUser.id, movie_id: movieId, is_favorite: true });
+        if (error) { 
+            console.error("Помилка збереження:", error); 
+            alert("Помилка БД: " + error.message); // Тепер ми побачимо, якщо база свариться!
+            // Відкочуємо візуальне натискання, бо база відхилила
+            userFavorites = userFavorites.filter(id => id !== movieId);
+            button.classList.remove('liked');
+            button.innerText = '🤍';
+        }
     }
 };
 
