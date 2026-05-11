@@ -110,14 +110,14 @@ logoutBtn.addEventListener('click', async () => {
     window.location.reload();
 });
 
-// ГЛАВНЫЙ СЛУШАТЕЛЬ СОСТОЯНИЯ
+// ГЛАВНИЙ СЛУХАЧ СТАНУ
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session) {
         currentUser = session.user;
         loginBtn.style.display = 'none'; 
         logoutBtn.style.display = 'inline-block';
         favoritesBtn.style.display = 'inline-block';
-        authModal.style.display = 'none'; // ЗАКРЫВАЕМ ОКНО ПРИ ВХОДЕ
+        authModal.style.display = 'none'; // ЗАКРИВАЄМО ВІКНО ПРИ ВХОДІ
         
         await loadFavorites();
         if(!isFavoritesMode) getMovies(currentUrl, false);
@@ -134,7 +134,6 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
 
 async function loadFavorites() {
     if (!currentUser) return;
-    // ВИПРАВЛЕНО: Тепер шукає в твоїй таблиці 'favorites'
     const { data, error } = await supabaseClient
         .from('favorites')
         .select('movie_id')
@@ -153,14 +152,12 @@ window.toggleFavorite = async function(movieId, event) {
         userFavorites = userFavorites.filter(id => id !== movieId);
         button.classList.remove('liked');
         button.innerText = '🤍';
-        // ВИПРАВЛЕНО
         await supabaseClient.from('favorites').delete().eq('user_id', currentUser.id).eq('movie_id', movieId);
         if (isFavoritesMode) button.closest('.movie').remove();
     } else {
         userFavorites.push(movieId);
         button.classList.add('liked');
         button.innerText = '❤️';
-        // ВИПРАВЛЕНО
         const { error } = await supabaseClient.from('favorites').insert({ 
             user_id: currentUser.id, 
             movie_id: movieId
@@ -192,7 +189,7 @@ favoritesBtn.addEventListener('click', async () => {
 });
 
 // ==========================================
-// 4. ІНШИЙ ФУНКЦІОНАЛ
+// 4. ІНШИЙ ФУНКЦІОНАЛ ТА ПОШУК
 // ==========================================
 themeToggleBtn.addEventListener('click', () => {
     document.body.classList.toggle('light-theme');
@@ -274,6 +271,21 @@ async function openDetails(id) {
 }
 
 closeModal.onclick = () => { modal.style.display = 'none'; trailerContainer.innerHTML = ''; };
+
+// ЛОГІКА ПОШУКУ
+form.addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    if(search.value){
+        isFavoritesMode = false; sentinel.style.display = 'block';
+        currentPage = 1;
+        if (searchType.value === 'title') currentUrl = `https://api.themoviedb.org/3/search/${currentType}?api_key=${API_KEY}&language=uk-UA&query=${search.value}`;
+        else {
+            const p = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${API_KEY}&language=uk-UA&query=${search.value}`).then(r => r.json());
+            if (p.results.length > 0) currentUrl = `https://api.themoviedb.org/3/discover/${currentType}?api_key=${API_KEY}&language=uk-UA&with_cast=${p.results[0].id}&sort_by=popularity.desc`;
+        }
+        getMovies(currentUrl, false);
+    }
+});
 
 const observer = new IntersectionObserver((entries) => {
     if(entries[0].isIntersecting && !isFetching && !isFavoritesMode) {
