@@ -1,0 +1,210 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@200;400;600&display=swap");
+
+:root {
+    --bg-color: #22254b;
+    --card-bg: #373b69;
+    --text-color: #ffffff;
+    --overview-bg: #ffffff;
+    --overview-text: #111111;
+    --skeleton-bg: #4a4e85;
+    --skeleton-shine: rgba(255, 255, 255, 0.1);
+}
+
+.light-theme {
+    --bg-color: #f0f2f5;
+    --card-bg: #ffffff;
+    --text-color: #333333;
+    --overview-bg: #f8f9fa;
+    --overview-text: #333333;
+    --skeleton-bg: #e2e5e7;
+    --skeleton-shine: rgba(255, 255, 255, 0.6);
+}
+
+*{ box-sizing: border-box; }
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: "Poppins", sans-serif;
+    margin: 0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+header {
+    background-color: var(--card-bg);
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: background-color 0.3s ease;
+}
+
+.nav-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-select, .search {
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+    transition: 0.2s ease-in-out;
+}
+
+.search-form { display: flex; align-items: center; }
+
+.light-style { background-color: #ffffff; color: #333333; border: 1px solid #cccccc; }
+.light-style:focus { border-color: #0d6efd; }
+
+.filter-btn {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border: 2px solid var(--bg-color);
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    font-family: inherit;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: 0.2s;
+}
+
+.action-btn { background-color: #0d6efd; border-color: #0d6efd; color: white; font-weight: 600; }
+.action-btn:hover { background-color: #0b5ed7; }
+
+main { display: flex; flex-wrap: wrap; justify-content: center; min-height: 50vh; }
+
+.movie {
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    position: relative;
+    width: 283px;
+    margin: 1rem;
+    transition: background-color 0.3s ease;
+}
+
+.movie img { width: 100%; height: 425px; object-fit: cover;}
+
+.movie-info {
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem 1rem;
+    letter-spacing: 0.5px;
+}
+
+.movie-info h3 { margin: 0; font-size: 1.1rem; }
+
+.movie-info span {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border-radius: 3px;
+    padding: 0.25rem 0.5rem;
+    font-weight: bold;
+} 
+.movie-info span.green{ color: rgb(39, 189, 39); }
+.movie-info span.orange{ color: orange; }
+.movie-info span.red{ color: rgb(189, 42, 42); }
+
+.overview {
+    background-color: var(--overview-bg);
+    color: var(--overview-text);
+    position: absolute;
+    max-height: 100%;
+    overflow: auto;
+    padding: 2rem;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    transform: translateY(101%);
+    transition: transform 0.3s ease-in;
+}
+
+.movie:hover .overview { transform: translateY(0); }
+
+.details-btn {
+    display: block; width: 100%; margin-top: 15px; padding: 10px;
+    background: #e50914; color: white; border: none; border-radius: 5px;
+    cursor: pointer; font-weight: bold;
+}
+.details-btn:hover { background: #b20710; }
+
+/* НОВЕ: Крутилка завантаження */
+.spinner {
+    width: 40px; height: 40px;
+    border: 4px solid var(--card-bg);
+    border-top: 4px solid #0d6efd;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* МОДАЛКА */
+.modal {
+    display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+    width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);
+}
+.modal-content {
+    background-color: var(--card-bg); color: var(--text-color);
+    margin: 2% auto; padding: 20px; border-radius: 10px;
+    width: 80%; max-width: 800px; max-height: 90vh;
+    overflow-y: auto; position: relative;
+}
+.close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+.close-btn:hover { color: #e50914; }
+.trailer-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; margin-top: 15px; border-radius: 8px; }
+.trailer-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
+
+.similar-movies-container { display: flex; gap: 15px; overflow-x: auto; padding: 10px 0; }
+.similar-movies-container::-webkit-scrollbar { height: 8px; }
+.similar-movies-container::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+.similar-movie-card { min-width: 120px; cursor: pointer; transition: transform 0.2s; }
+.similar-movie-card:hover { transform: scale(1.05); }
+.similar-movie-card img { width: 100%; height: 180px; object-fit: cover; border-radius: 5px; }
+.similar-movie-card h4 { font-size: 0.8rem; margin: 5px 0 0 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* СКЕЛЕТОНИ */
+.skeleton { background-color: var(--skeleton-bg); position: relative; overflow: hidden; }
+.skeleton::after {
+    content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, var(--skeleton-shine), transparent);
+    animation: loading 1.5s infinite;
+}
+@keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.skeleton-movie { width: 283px; height: 500px; margin: 1rem; border-radius: 10px; }
+/* --- СЕРДЕЧКА (ЛАЙКИ) --- */
+.favorite-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s ease;
+    z-index: 10;
+}
+.favorite-btn:hover {
+    transform: scale(1.15);
+}
+.favorite-btn.liked {
+    color: #e50914; /* Червоне сердечко */
+}
