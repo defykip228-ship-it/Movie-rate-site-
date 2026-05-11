@@ -53,7 +53,6 @@ let currentType = 'movie';
 let currentUser = null; 
 let userFavorites = []; 
 
-// Жорсткий фільтр для головної сторінки
 const actualDate = '2024-01-01'; 
 let currentUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=uk-UA&sort_by=popularity.desc&primary_release_date.gte=${actualDate}&vote_count.gte=300&without_genres=99,10402`;
 
@@ -68,21 +67,17 @@ function resetAllFiltersUI() {
 }
 resetAllFiltersUI();
 
-const genresMap = {
-    28: "Бойовик", 12: "Пригоди", 16: "Мультфільм", 35: "Комедія",
-    80: "Кримінал", 99: "Документальний", 18: "Драма", 10751: "Сімейний",
-    14: "Фентезі", 36: "Історія", 27: "Жахи", 10402: "Музика",
-    9648: "Детектив", 10749: "Мелодрама", 878: "Фантастика",
-    10770: "ТБ", 53: "Трилер", 10752: "Військовий", 37: "Вестерн",
-    10759: "Бойовик/Пригоди", 10765: "Фантастика", 10768: "Війна/Політика"
-};
-
 // ==========================================
-// 3. АВТОРИЗАЦІЯ ТА ЛАЙКИ (SUPABASE)
+// 3. АВТОРИЗАЦІЯ ТА ЛАЙКИ
 // ==========================================
 let isLoginMode = true;
 
-loginBtn.addEventListener('click', () => { authModal.style.display = 'block'; authEmail.value = ''; authPassword.value = ''; });
+loginBtn.addEventListener('click', () => { 
+    authModal.style.display = 'block'; 
+    authEmail.value = ''; 
+    authPassword.value = ''; 
+});
+
 closeAuthModal.addEventListener('click', () => { authModal.style.display = 'none'; });
 
 authToggleLink.addEventListener('click', (e) => {
@@ -96,35 +91,36 @@ authToggleLink.addEventListener('click', (e) => {
 
 authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = authEmail.value; const password = authPassword.value;
+    const email = authEmail.value; 
+    const password = authPassword.value;
+    
     if (isLoginMode) {
         const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) alert("Помилка входу: " + error.message); else { authModal.style.display = 'none'; }
+        if (error) alert("Помилка: " + error.message);
     } else {
         const { error } = await supabaseClient.auth.signUp({ email, password });
-        if (error) alert("Помилка реєстрації: " + error.message); else { alert("Акаунт створено!"); authModal.style.display = 'none'; }
+        if (error) alert("Помилка: " + error.message);
+        else alert("Акаунт створено!");
     }
 });
 
-// Бронебійна кнопка ВИЙТИ
 logoutBtn.addEventListener('click', async () => {
     await supabaseClient.auth.signOut();
-    for (let key in localStorage) {
-        if (key.includes('-auth-token') || key.includes('supabase')) {
-            localStorage.removeItem(key);
-        }
-    }
+    localStorage.clear();
     window.location.reload();
 });
 
+// ГЛАВНЫЙ СЛУШАТЕЛЬ СОСТОЯНИЯ
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session) {
         currentUser = session.user;
         loginBtn.style.display = 'none'; 
         logoutBtn.style.display = 'inline-block';
         favoritesBtn.style.display = 'inline-block';
-        await loadFavorites(); 
-        if(!isFavoritesMode) getMovies(currentUrl, false); 
+        authModal.style.display = 'none'; // ЗАКРЫВАЕМ ОКНО ПРИ ВХОДЕ
+        
+        await loadFavorites();
+        if(!isFavoritesMode) getMovies(currentUrl, false);
     } else {
         currentUser = null;
         userFavorites = [];
@@ -132,22 +128,23 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
         logoutBtn.style.display = 'none';
         favoritesBtn.style.display = 'none';
         isFavoritesMode = false;
+        getMovies(currentUrl, false);
     }
 });
 
 async function loadFavorites() {
     if (!currentUser) return;
+    // ВИПРАВЛЕНО: Тепер шукає в твоїй таблиці 'favorites'
     const { data, error } = await supabaseClient
-        .from('user_actions')
+        .from('favorites')
         .select('movie_id')
-        .eq('user_id', currentUser.id)
-        .eq('is_favorite', true);
+        .eq('user_id', currentUser.id);
     if (data) userFavorites = data.map(item => item.movie_id);
 }
 
 window.toggleFavorite = async function(movieId, event) {
-    event.stopPropagation(); 
-    if (!currentUser) { alert("Будь ласка, увійдіть в акаунт, щоб зберігати фільми!"); return; }
+    event.stopPropagation();
+    if (!currentUser) { alert("Увійдіть, щоб зберігати!"); return; }
     
     const button = event.target;
     const isLiked = userFavorites.includes(movieId);
@@ -156,20 +153,20 @@ window.toggleFavorite = async function(movieId, event) {
         userFavorites = userFavorites.filter(id => id !== movieId);
         button.classList.remove('liked');
         button.innerText = '🤍';
-        
-        const { error } = await supabaseClient.from('user_actions').delete().eq('user_id', currentUser.id).eq('movie_id', movieId);
-        if (error) { console.error("Помилка видалення:", error); alert("Не вдалося видалити: " + error.message); }
+        // ВИПРАВЛЕНО
+        await supabaseClient.from('favorites').delete().eq('user_id', currentUser.id).eq('movie_id', movieId);
         if (isFavoritesMode) button.closest('.movie').remove();
     } else {
         userFavorites.push(movieId);
         button.classList.add('liked');
         button.innerText = '❤️';
-        
-        const { error } = await supabaseClient.from('user_actions').insert({ user_id: currentUser.id, movie_id: movieId, is_favorite: true });
-        if (error) { 
-            console.error("Помилка збереження:", error); 
-            alert("Помилка БД: " + error.message); 
-            userFavorites = userFavorites.filter(id => id !== movieId);
+        // ВИПРАВЛЕНО
+        const { error } = await supabaseClient.from('favorites').insert({ 
+            user_id: currentUser.id, 
+            movie_id: movieId
+        });
+        if (error) {
+            alert("Помилка збереження: " + error.message);
             button.classList.remove('liked');
             button.innerText = '🤍';
         }
@@ -180,32 +177,23 @@ favoritesBtn.addEventListener('click', async () => {
     if (!currentUser) return;
     isFavoritesMode = true;
     main.innerHTML = '';
-    sentinel.style.display = 'none'; 
-    
+    sentinel.style.display = 'none';
     if (userFavorites.length === 0) {
-        main.innerHTML = '<h2 style="text-align: center; width: 100%;">У вас ще немає збережених фільмів 😔</h2>';
+        main.innerHTML = '<h2 style="text-align:center;width:100%">Порожньо 😔</h2>';
         return;
     }
-    
     showSkeletons();
-    
-    try {
-        const promises = userFavorites.map(id => 
-            fetch(`https://api.themoviedb.org/3/${currentType}/${id}?api_key=${API_KEY}&language=uk-UA`).then(res => res.json())
-        );
-        const results = await Promise.all(promises);
-        main.innerHTML = '';
-        
-        const validMovies = results.filter(m => m.id);
-        if(validMovies.length > 0) showMovies(validMovies);
-        else main.innerHTML = '<h2 style="text-align: center; width: 100%;">У цій категорії немає збережень.</h2>';
-    } catch(e) { console.error(e); }
+    const promises = userFavorites.map(id => 
+        fetch(`https://api.themoviedb.org/3/${currentType}/${id}?api_key=${API_KEY}&language=uk-UA`).then(res => res.json())
+    );
+    const results = await Promise.all(promises);
+    main.innerHTML = '';
+    showMovies(results.filter(m => m.id));
 });
 
 // ==========================================
-// 4. ІНШИЙ КОД САЙТУ
+// 4. ІНШИЙ ФУНКЦІОНАЛ
 // ==========================================
-if (localStorage.getItem('theme') === 'light') { document.body.classList.add('light-theme'); themeToggleBtn.innerText = '🌙 Темна тема'; }
 themeToggleBtn.addEventListener('click', () => {
     document.body.classList.toggle('light-theme');
     const isLight = document.body.classList.contains('light-theme');
@@ -216,17 +204,82 @@ themeToggleBtn.addEventListener('click', () => {
 function updateFilters() {
     isFavoritesMode = false;
     sentinel.style.display = 'block';
-    const sortBy = sortSelect.value; let genre = genreSelect.value; const rating = ratingSelect.value;
-    if (currentType === 'tv' && genre) {
-        if (genre === '28' || genre === '12') genre = '10759'; 
-        if (genre === '878' || genre === '14') genre = '10765'; 
-        if (genre === '53') genre = '9648'; 
-    }
+    const sortBy = sortSelect.value;
+    let genre = genreSelect.value;
+    const rating = ratingSelect.value;
     let filterUrl = `https://api.themoviedb.org/3/discover/${currentType}?sort_by=${sortBy}&api_key=${API_KEY}&language=uk-UA`;
     if (genre) filterUrl += `&with_genres=${genre}`;
     if (rating) filterUrl += `&vote_average.gte=${rating}`;
-    if (sortBy === 'vote_average.desc') { filterUrl += `&vote_count.gte=2000`; filterUrl += `&without_genres=99,10402`; }
-    currentPage = 1; currentUrl = filterUrl; getMovies(currentUrl, false);
+    currentPage = 1; 
+    currentUrl = filterUrl; 
+    getMovies(currentUrl, false);
 }
 
-contentTypeSelect.addEventListener('change', () => { currentType =
+contentTypeSelect.addEventListener('change', () => { currentType = contentTypeSelect.value; updateFilters(); });
+applyFiltersBtn.addEventListener('click', () => { updateFilters(); });
+homeBtn.addEventListener('click', () => { window.location.reload(); });
+
+async function getMovies(url, append = false) {
+    if (isFetching || isFavoritesMode) return;
+    isFetching = true;
+    if (!append) showSkeletons();
+    try {
+        const resp = await fetch(`${url}&page=${currentPage}`);
+        const data = await resp.json();
+        if (!append) main.innerHTML = '';
+        if (data.results) {
+            showMovies(data.results);
+            totalPages = data.total_pages > 500 ? 500 : data.total_pages;
+        }
+    } catch (e) { console.error(e); }
+    isFetching = false;
+}
+
+function showMovies(movies){
+    movies.forEach(movie => {
+        const title = movie.title || movie.name;
+        const imageSrc = movie.poster_path ? IMGPATH + movie.poster_path : 'https://via.placeholder.com/500x750?text=No+Image';
+        const isLiked = userFavorites.includes(movie.id);
+        const movieEl = document.createElement('div');
+        movieEl.classList.add('movie');
+        movieEl.innerHTML = `
+            <button class="favorite-btn ${isLiked ? 'liked' : ''}" onclick="toggleFavorite(${movie.id}, event)">${isLiked ? '❤️' : '🤍'}</button>
+            <img src="${imageSrc}" alt="${title}"/>
+            <div class="movie-info"><h3>${title}</h3><span class="green">${movie.vote_average}</span></div>
+            <div class="overview"><h3>Опис:</h3>${movie.overview || 'Немає'} <br><br>
+            <button class="details-btn" onclick="openDetails(${movie.id})">Деталі</button></div>`;
+        main.appendChild(movieEl);
+    });
+}
+
+function showSkeletons() {
+    main.innerHTML = '';
+    for (let i = 0; i < 10; i++) {
+        const div = document.createElement('div');
+        div.classList.add('skeleton', 'skeleton-movie');
+        main.appendChild(div);
+    }
+}
+
+async function openDetails(id) {
+    modal.style.display = 'block';
+    modalTitle.innerText = "Завантаження...";
+    try {
+        const resp = await fetch(`https://api.themoviedb.org/3/${currentType}/${id}?api_key=${API_KEY}&language=uk-UA&append_to_response=videos,credits`);
+        const data = await resp.json();
+        modalTitle.innerText = data.title || data.name;
+        const trailer = data.videos.results.find(v => v.type === 'Trailer');
+        trailerContainer.innerHTML = trailer ? `<iframe src="https://www.youtube.com/embed/${trailer.key}" allowfullscreen></iframe>` : 'Трейлер відсутній';
+    } catch (e) { console.error(e); }
+}
+
+closeModal.onclick = () => { modal.style.display = 'none'; trailerContainer.innerHTML = ''; };
+
+const observer = new IntersectionObserver((entries) => {
+    if(entries[0].isIntersecting && !isFetching && !isFavoritesMode) {
+        currentPage++; getMovies(currentUrl, true);
+    }
+}, { rootMargin: '200px' });
+observer.observe(sentinel);
+
+getMovies(currentUrl, false);
