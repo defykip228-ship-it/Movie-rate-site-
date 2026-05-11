@@ -104,12 +104,20 @@ authForm.addEventListener('submit', async (e) => {
     }
 });
 
+// БЕЗЖАЛЬНА КНОПКА ВИХОДУ
 logoutBtn.addEventListener('click', async () => {
-    await supabaseClient.auth.signOut();
-    localStorage.clear();
-    window.location.reload();
+    try {
+        // Пробуємо культурно попрощатися з базою даних
+        await supabaseClient.auth.signOut();
+    } catch (error) {
+        console.error("База свариться, але ми все одно виходимо:", error);
+    } finally {
+        // Цей код виконається ЗАВЖДИ, навіть якщо інтернет пропав або база зависла
+        localStorage.clear();
+        sessionStorage.clear(); // Чистимо взагалі все
+        window.location.reload(); // Перезавантажуємо сторінку чистою
+    }
 });
-
 // ГЛАВНИЙ СЛУХАЧ СТАНУ
 supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session) {
