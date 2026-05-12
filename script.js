@@ -55,8 +55,29 @@ let userFavorites = [];
 
 const actualDate = '2024-01-01';
 
-// БАГ #2 ВИПРАВЛЕНО: додано vote_count.gte=100 щоб фільми з 1 оцінкою не спливали нагору
-let currentUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=uk-UA&sort_by=popularity.desc&primary_release_date.gte=${actualDate}&vote_count.gte=100&without_genres=99,10402`;
+// include_adult=false + without_genres=10749(дорослий контент) щоб виключити непристойне
+// vote_count.gte=500 — справжній рейтинг потребує достатньо голосів
+const ADULT_FILTER = `&include_adult=false&without_genres=10749`;
+const MIN_VOTES = 500;
+
+let currentUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=uk-UA&sort_by=popularity.desc&vote_count.gte=${MIN_VOTES}${ADULT_FILTER}`;
+
+// Жанри у фільмів і серіалів різні — динамічно підвантажуємо з TMDB
+async function loadGenres(type) {
+    genreSelect.innerHTML = '<option value="">Всі жанри</option>';
+    try {
+        const resp = await fetch(`https://api.themoviedb.org/3/genre/${type}/list?api_key=${API_KEY}&language=uk-UA`);
+        const data = await resp.json();
+        if (data.genres) {
+            data.genres.forEach(genre => {
+                const option = document.createElement('option');
+                option.value = genre.id;
+                option.textContent = genre.name;
+                genreSelect.appendChild(option);
+            });
+        }
+    } catch (e) { console.error("Помилка завантаження жанрів:", e); }
+}
 
 function resetAllFiltersUI() {
     contentTypeSelect.value = 'movie';
@@ -139,18 +160,14 @@ logoutBtn.addEventListener('click', async () => {
     }
 });
 
-// БАГ #3 ВИПРАВЛЕНО: onAuthStateChange тепер надійно оновлює currentUser
-// і завантажує улюблені при кожному відновленні сесії (в т.ч. після перезавантаження)
-supabaseClient.auth.onAuthStateChange(async (event, session) => {
+// Функція оновлення UI залежно від стану сесії
+function applySession(session) {
     if (session) {
         currentUser = session.user;
         loginBtn.style.display = 'none';
         logoutBtn.style.display = 'inline-block';
         favoritesBtn.style.display = 'inline-block';
         authModal.style.display = 'none';
-
-        await loadFavorites(); // завантажуємо улюблені ОДРАЗУ після відновлення сесії
-        if (!isFavoritesMode) getMovies(currentUrl, false);
     } else {
         currentUser = null;
         userFavorites = [];
@@ -158,6 +175,29 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
         logoutBtn.style.display = 'none';
         favoritesBtn.style.display = 'none';
         isFavoritesMode = false;
+    }
+}
+
+// ГОЛОВНИЙ ЗАПУСК: спочатку чекаємо сесію, ПОТІМ завантажуємо фільми
+// Це виправляє баг коли після перезавантаження кнопки скидаються і улюблені зникають
+async function init() {
+    await loadGenres(currentType); // завантажуємо жанри для початкового типу (movie)
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    applySession(session);
+    if (session) await loadFavorites();
+    getMovies(currentUrl, false);
+}
+
+// Слухач для подій ПІСЛЯ ініціалізації (вхід/вихід під час роботи)
+supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    // INITIAL_SESSION вже оброблено в init(), пропускаємо щоб не дублювати запити
+    if (event === 'INITIAL_SESSION') return;
+
+    applySession(session);
+    if (session) {
+        await loadFavorites();
+        if (!isFavoritesMode) getMovies(currentUrl, false);
+    } else {
         getMovies(currentUrl, false);
     }
 });
@@ -235,8 +275,7 @@ function updateFilters() {
     let genre = genreSelect.value;
     const rating = ratingSelect.value;
 
-    // БАГ #2 ВИПРАВЛЕНО: vote_count.gte=100 також при фільтрації
-    let filterUrl = `https://api.themoviedb.org/3/discover/${currentType}?sort_by=${sortBy}&api_key=${API_KEY}&language=uk-UA&vote_count.gte=100`;
+    let filterUrl = `https://api.themoviedb.org/3/discover/${currentType}?sort_by=${sortBy}&api_key=${API_KEY}&language=uk-UA&vote_count.gte=${MIN_VOTES}${ADULT_FILTER}`;
     if (genre) filterUrl += `&with_genres=${genre}`;
     if (rating) filterUrl += `&vote_average.gte=${rating}`;
     currentPage = 1;
@@ -244,7 +283,11 @@ function updateFilters() {
     getMovies(currentUrl, false);
 }
 
-contentTypeSelect.addEventListener('change', () => { currentType = contentTypeSelect.value; updateFilters(); });
+contentTypeSelect.addEventListener('change', () => {
+    currentType = contentTypeSelect.value;
+    loadGenres(currentType); // перезавантажуємо жанри для нового типу (фільм/серіал)
+    updateFilters();
+});
 applyFiltersBtn.addEventListener('click', () => { updateFilters(); });
 homeBtn.addEventListener('click', () => { window.location.reload(); });
 
@@ -257,7 +300,7 @@ randomBtn.addEventListener('click', async () => {
     try {
         // Беремо рандомну сторінку (1-100, щоб не виходити за межі доступних)
         const randomPage = Math.floor(Math.random() * 100) + 1;
-        const url = `https://api.themoviedb.org/3/discover/${currentType}?api_key=${API_KEY}&language=uk-UA&sort_by=popularity.desc&vote_count.gte=100&page=${randomPage}`;
+        const url = `https://api.themoviedb.org/3/discover/${currentType}?api_key=${API_KEY}&language=uk-UA&sort_by=popularity.desc&vote_count.gte=${MIN_VOTES}${ADULT_FILTER}&page=${randomPage}`;
         const resp = await fetch(url);
         const data = await resp.json();
 
@@ -347,7 +390,7 @@ form.addEventListener("submit", async (e) => {
         } else {
             const p = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${API_KEY}&language=uk-UA&query=${search.value}`).then(r => r.json());
             if (p.results.length > 0) {
-                currentUrl = `https://api.themoviedb.org/3/discover/${currentType}?api_key=${API_KEY}&language=uk-UA&with_cast=${p.results[0].id}&sort_by=popularity.desc&vote_count.gte=100`;
+                currentUrl = `https://api.themoviedb.org/3/discover/${currentType}?api_key=${API_KEY}&language=uk-UA&with_cast=${p.results[0].id}&sort_by=popularity.desc&vote_count.gte=${MIN_VOTES}${ADULT_FILTER}`;
             }
         }
         getMovies(currentUrl, false);
@@ -362,4 +405,4 @@ const observer = new IntersectionObserver((entries) => {
 }, { rootMargin: '200px' });
 observer.observe(sentinel);
 
-getMovies(currentUrl, false);
+init();
