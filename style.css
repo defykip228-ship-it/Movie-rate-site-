@@ -20,7 +20,7 @@
     --skeleton-shine: rgba(255, 255, 255, 0.6);
 }
 
-*{ box-sizing: border-box; }
+* { box-sizing: border-box; }
 
 body {
     background-color: var(--bg-color);
@@ -77,10 +77,13 @@ header {
 }
 
 .action-btn { background-color: #0d6efd; border-color: #0d6efd; color: white; font-weight: 600; }
-.action-btn:hover { background-color: #0b5ed7; }
+.action-btn:hover { opacity: 0.88; }
 
 main { display: flex; flex-wrap: wrap; justify-content: center; min-height: 50vh; }
 
+/* ============================
+   КАРТКА ФІЛЬМУ
+   ============================ */
 .movie {
     background-color: var(--card-bg);
     border-radius: 10px;
@@ -89,10 +92,12 @@ main { display: flex; flex-wrap: wrap; justify-content: center; min-height: 50vh
     position: relative;
     width: 283px;
     margin: 1rem;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
-.movie img { width: 100%; height: 425px; object-fit: cover;}
+.movie:hover { transform: translateY(-4px); }
+
+.movie img { width: 100%; height: 425px; object-fit: cover; display: block; }
 
 .movie-info {
     color: var(--text-color);
@@ -111,11 +116,15 @@ main { display: flex; flex-wrap: wrap; justify-content: center; min-height: 50vh
     border-radius: 3px;
     padding: 0.25rem 0.5rem;
     font-weight: bold;
-} 
-.movie-info span.green{ color: rgb(39, 189, 39); }
-.movie-info span.orange{ color: orange; }
-.movie-info span.red{ color: rgb(189, 42, 42); }
+    white-space: nowrap;
+}
+.movie-info span.green  { color: rgb(39, 189, 39); }
+.movie-info span.orange { color: orange; }
+.movie-info span.red    { color: rgb(189, 42, 42); }
 
+/* ============================
+   ОПИС (ховер)
+   ============================ */
 .overview {
     background-color: var(--overview-bg);
     color: var(--overview-text);
@@ -123,37 +132,87 @@ main { display: flex; flex-wrap: wrap; justify-content: center; min-height: 50vh
     max-height: 100%;
     overflow: auto;
     padding: 2rem;
-    left: 0;
-    bottom: 0;
-    right: 0;
+    left: 0; bottom: 0; right: 0;
     transform: translateY(101%);
     transition: transform 0.3s ease-in;
 }
-
 .movie:hover .overview { transform: translateY(0); }
 
 .details-btn {
     display: block; width: 100%; margin-top: 15px; padding: 10px;
     background: #e50914; color: white; border: none; border-radius: 5px;
-    cursor: pointer; font-weight: bold;
+    cursor: pointer; font-weight: bold; font-family: inherit; font-size: 0.9rem;
 }
 .details-btn:hover { background: #b20710; }
 
-/* НОВЕ: Крутилка завантаження */
+/* ============================
+   КНОПКА УЛЮБЛЕНОГО (❤️)
+   ============================ */
+.favorite-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    color: white;
+    font-size: 1.3rem;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s ease, background 0.2s ease;
+    z-index: 10;
+}
+.favorite-btn:hover { transform: scale(1.2); background: rgba(0,0,0,0.8); }
+.favorite-btn.liked { background: rgba(229, 9, 20, 0.75); }
+
+/* ============================
+   КНОПКА "ПЕРЕГЛЯНУТИ ПІЗНІШЕ" (🕐)
+   ============================ */
+.watchlater-btn {
+    position: absolute;
+    top: 10px;
+    right: 56px; /* поряд з кнопкою серця, зліва від неї */
+    background: rgba(0, 0, 0, 0.6);
+    border: none;
+    color: white;
+    font-size: 1.3rem;
+    cursor: pointer;
+    border-radius: 50%;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s ease, background 0.2s ease;
+    z-index: 10;
+}
+.watchlater-btn:hover { transform: scale(1.2); background: rgba(0,0,0,0.8); }
+.watchlater-btn.watchlater-active { background: rgba(230, 126, 0, 0.85); }
+
+/* ============================
+   СПІНЕР ЗАВАНТАЖЕННЯ
+   ============================ */
 .spinner {
     width: 40px; height: 40px;
     border: 4px solid var(--card-bg);
     border-top: 4px solid #0d6efd;
     border-radius: 50%;
     animation: spin 1s linear infinite;
-    margin: 0 auto;
+    margin: 20px auto;
 }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* МОДАЛКА */
+/* ============================
+   МОДАЛКА
+   ============================ */
 .modal {
-    display: none; position: fixed; z-index: 1000; left: 0; top: 0;
-    width: 100%; height: 100%; background-color: rgba(0,0,0,0.8);
+    display: none; position: fixed; z-index: 1000;
+    left: 0; top: 0; width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.8);
 }
 .modal-content {
     background-color: var(--card-bg); color: var(--text-color);
@@ -161,20 +220,42 @@ main { display: flex; flex-wrap: wrap; justify-content: center; min-height: 50vh
     width: 80%; max-width: 800px; max-height: 90vh;
     overflow-y: auto; position: relative;
 }
-.close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+.close-btn {
+    color: #aaa; float: right; font-size: 28px;
+    font-weight: bold; cursor: pointer; line-height: 1;
+}
 .close-btn:hover { color: #e50914; }
-.trailer-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; margin-top: 15px; border-radius: 8px; }
-.trailer-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; }
 
-.similar-movies-container { display: flex; gap: 15px; overflow-x: auto; padding: 10px 0; }
+.trailer-container {
+    position: relative; padding-bottom: 56.25%;
+    height: 0; overflow: hidden;
+    margin-top: 15px; border-radius: 8px;
+}
+.trailer-container iframe {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%; border: none;
+}
+
+/* ============================
+   СХОЖІ ФІЛЬМИ
+   ============================ */
+.similar-movies-container {
+    display: flex; gap: 15px;
+    overflow-x: auto; padding: 10px 0;
+}
 .similar-movies-container::-webkit-scrollbar { height: 8px; }
 .similar-movies-container::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
 .similar-movie-card { min-width: 120px; cursor: pointer; transition: transform 0.2s; }
 .similar-movie-card:hover { transform: scale(1.05); }
 .similar-movie-card img { width: 100%; height: 180px; object-fit: cover; border-radius: 5px; }
-.similar-movie-card h4 { font-size: 0.8rem; margin: 5px 0 0 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.similar-movie-card h4 {
+    font-size: 0.8rem; margin: 5px 0 0; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
-/* СКЕЛЕТОНИ */
+/* ============================
+   СКЕЛЕТОНИ
+   ============================ */
 .skeleton { background-color: var(--skeleton-bg); position: relative; overflow: hidden; }
 .skeleton::after {
     content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -183,28 +264,3 @@ main { display: flex; flex-wrap: wrap; justify-content: center; min-height: 50vh
 }
 @keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 .skeleton-movie { width: 283px; height: 500px; margin: 1rem; border-radius: 10px; }
-/* --- СЕРДЕЧКА (ЛАЙКИ) --- */
-.favorite-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(0, 0, 0, 0.6);
-    border: none;
-    color: white;
-    font-size: 1.5rem;
-    cursor: pointer;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: transform 0.2s ease;
-    z-index: 10;
-}
-.favorite-btn:hover {
-    transform: scale(1.15);
-}
-.favorite-btn.liked {
-    color: #e50914; /* Червоне сердечко */
-}
