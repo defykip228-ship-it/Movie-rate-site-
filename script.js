@@ -149,15 +149,21 @@ authForm.addEventListener('submit', async (e) => {
 });
 
 logoutBtn.addEventListener('click', async () => {
-    try {
-        await supabaseClient.auth.signOut();
-    } catch (error) {
-        console.error("Помилка виходу:", error);
-    } finally {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.reload();
-    }
+    // Чистимо локальні дані ОДРАЗУ, не чекаємо відповіді від сервера
+    currentUser = null;
+    userFavorites = [];
+    
+    // Видаляємо токени Supabase з localStorage вручну (надійніше ніж signOut через мережу)
+    Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') || key.includes('supabase')) {
+            localStorage.removeItem(key);
+        }
+    });
+    
+    // Пробуємо signOut на сервері (не критично якщо не вдасться)
+    try { await supabaseClient.auth.signOut(); } catch (e) { /* ігноруємо */ }
+    
+    window.location.reload();
 });
 
 // Функція оновлення UI залежно від стану сесії
@@ -204,11 +210,23 @@ supabaseClient.auth.onAuthStateChange(async (event, session) => {
 
 async function loadFavorites() {
     if (!currentUser) return;
-    const { data, error } = await supabaseClient
-        .from('favorites')
-        .select('movie_id')
-        .eq('user_id', currentUser.id);
-    if (data) userFavorites = data.map(item => item.movie_id);
+    try {
+        const { data, error } = await supabaseClient
+            .from('favorites')
+            .select('movie_id')
+            .eq('user_id', currentUser.id);
+        if (error) {
+            console.error("Помилка завантаження улюблених:", error.message);
+            return;
+        }
+        if (data) {
+            // movie_id може бути числом або рядком — нормалізуємо до числа
+            userFavorites = data.map(item => Number(item.movie_id));
+            console.log("Завантажено улюблених:", userFavorites.length);
+        }
+    } catch (e) {
+        console.error("loadFavorites crash:", e);
+    }
 }
 
 window.toggleFavorite = async function(movieId, event) {
@@ -216,6 +234,7 @@ window.toggleFavorite = async function(movieId, event) {
     if (!currentUser) { alert("Увійдіть, щоб зберігати!"); return; }
 
     const button = event.target;
+    movieId = Number(movieId); // нормалізуємо до числа щоб includes() працював правильно
     const isLiked = userFavorites.includes(movieId);
 
     if (isLiked) {
@@ -365,15 +384,44 @@ function showSkeletons() {
 async function openDetails(id) {
     modal.style.display = 'block';
     modalTitle.innerText = "Завантаження...";
+    if (modalCast) modalCast.innerText = "Актори: Завантаження...";
+    trailerContainer.innerHTML = '';
+
     try {
-        const resp = await fetch(`https://api.themoviedb.org/3/${currentType}/${id}?api_key=${API_KEY}&language=uk-UA&append_to_response=videos,credits`);
-        const data = await resp.json();
-        modalTitle.innerText = data.title || data.name;
-        const trailer = data.videos.results.find(v => v.type === 'Trailer');
+        // Два запити паралельно: українська і англійська — для трейлерів і акторів
+        const [ukResp, enResp] = await Promise.all([
+            fetch(`https://api.themoviedb.org/3/${currentType}/${id}?api_key=${API_KEY}&language=uk-UA&append_to_response=videos,credits`),
+            fetch(`https://api.themoviedb.org/3/${currentType}/${id}?api_key=${API_KEY}&language=en-US&append_to_response=videos,credits`)
+        ]);
+        const ukData = await ukResp.json();
+        const enData = await enResp.json();
+
+        // Назва: українська якщо є, інакше англійська
+        modalTitle.innerText = ukData.title || ukData.name || enData.title || enData.name;
+
+        // Трейлер: спочатку шукаємо українською, якщо немає — англійською
+        const ukTrailer = ukData.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+        const enTrailer = enData.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+        const trailer = ukTrailer || enTrailer;
+
         trailerContainer.innerHTML = trailer
             ? `<iframe src="https://www.youtube.com/embed/${trailer.key}" allowfullscreen></iframe>`
-            : 'Трейлер відсутній';
-    } catch (e) { console.error(e); }
+            : '<p style="padding:10px">Трейлер відсутній</p>';
+
+        // Актори: з англійської версії (там завжди повний список), перші 8
+        const cast = enData.credits?.cast?.slice(0, 8) || [];
+        if (modalCast) {
+            modalCast.innerText = cast.length > 0
+                ? "Актори: " + cast.map(a => a.name).join(', ')
+                : "Актори: інформація відсутня";
+        }
+
+    } catch (e) {
+        console.error("Помилка завантаження деталей:", e);
+        modalTitle.innerText = "Помилка завантаження";
+        if (modalCast) modalCast.innerText = "";
+        trailerContainer.innerHTML = '<p style="padding:10px">Не вдалося завантажити дані</p>';
+    }
 }
 
 closeModal.onclick = () => { modal.style.display = 'none'; trailerContainer.innerHTML = ''; };
@@ -388,9 +436,21 @@ form.addEventListener("submit", async (e) => {
         if (searchType.value === 'title') {
             currentUrl = `https://api.themoviedb.org/3/search/${currentType}?api_key=${API_KEY}&language=uk-UA&query=${search.value}`;
         } else {
-            const p = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${API_KEY}&language=uk-UA&query=${search.value}`).then(r => r.json());
-            if (p.results.length > 0) {
-                currentUrl = `https://api.themoviedb.org/3/discover/${currentType}?api_key=${API_KEY}&language=uk-UA&with_cast=${p.results[0].id}&sort_by=popularity.desc&vote_count.gte=${MIN_VOTES}${ADULT_FILTER}`;
+            // Пошук актора: TMDB шукає по справжньому імені (англійською або оригінальною мовою)
+            // Наприклад: "Tom Hanks", "Том Хенкс", "Scarlett Johansson"
+            // Спочатку шукаємо англійською (більше результатів), потім українською як fallback
+            let personData = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(search.value)}`).then(r => r.json());
+            if (!personData.results || personData.results.length === 0) {
+                personData = await fetch(`https://api.themoviedb.org/3/search/person?api_key=${API_KEY}&language=uk-UA&query=${encodeURIComponent(search.value)}`).then(r => r.json());
+            }
+            if (personData.results && personData.results.length > 0) {
+                const personId = personData.results[0].id;
+                const personName = personData.results[0].name;
+                console.log("Знайдено актора:", personName, "ID:", personId);
+                currentUrl = `https://api.themoviedb.org/3/discover/${currentType}?api_key=${API_KEY}&language=uk-UA&with_cast=${personId}&sort_by=popularity.desc&vote_count.gte=${MIN_VOTES}${ADULT_FILTER}`;
+            } else {
+                main.innerHTML = `<h2 style="text-align:center;width:100%">Актора не знайдено 😔<br><small>Спробуйте ввести ім'я англійською</small></h2>`;
+                return;
             }
         }
         getMovies(currentUrl, false);
